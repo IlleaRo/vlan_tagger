@@ -4,6 +4,7 @@
 #define FILE_DIR "vlan-tagger.cfg"
 
 int ip_converting(struct in_addr *, const char *);
+char* line_editor(char *);
 int tag_converting(int *, const char *);
 int ip_comparison(const struct in_addr, const struct in_addr);
 int ip_str_to_int(char *, int *);
@@ -151,7 +152,7 @@ int config_file_read(tag_rules_t *tag_rules_obj, int size)
 
     for (i = 0;; i++)
     {
-		char rule[37] = {0};
+		char rule[100] = { 0 };
         char *prule;
         char *rule_part;
         int full_stop_count;
@@ -175,14 +176,27 @@ int config_file_read(tag_rules_t *tag_rules_obj, int size)
             }
         }
 
-        full_stop_count = char_count(rule, '-');
+        char* real_start;
+        if ((real_start = line_editor(rule)) == NULL)
+        {
+            fclose(pfile);
+            return -10;
+        }
+
+        if (*real_start == '\0' || *real_start == '#' || *real_start == '\n')
+        {
+            --i;
+            continue;
+        }
+
+        full_stop_count = char_count(real_start, '-');
         if (full_stop_count < 1 || full_stop_count > 2)
         {
             fclose(pfile);
             return -5;
         }
 
-        rule_part = strtok(rule, "-");
+        rule_part = strtok(real_start, "-");
         if (rule_part == NULL)
         {
             fclose(pfile);
@@ -372,4 +386,45 @@ int char_count(const char *str, char symbol)
     }
 
     return count;
+}
+
+char* line_editor(char *string)
+{
+    if (!string)
+    {
+        return NULL;
+    }
+
+    //Поиск начала строки
+    unsigned long i;
+    for (i = 0; i < strlen(string); ++i)
+    {
+        if (string[i] != ' ' && string[i] != '\t')
+        {
+            string = &string[i];
+            break;
+        }
+    }
+
+    // Ситуация, когда вся строка - комментарий
+    if (*string == '#')
+    {
+        return string;
+    }
+
+    //Поиск пробелов или табуляций до комментариев
+    for (char j = 0; j < 37; j++)
+    {
+        if (string[j] == '\n')
+        {
+            continue;
+        }
+        if (string[j] == ' ' || string[j] == '\t' || string[j] == '#')
+        {
+            string[j] = '\0';
+            break;
+        }
+    }
+
+    return string;
 }
