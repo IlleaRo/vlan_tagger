@@ -11,7 +11,7 @@ fi
 
 for pid in $pids; do
     echo "Остановка процесса с PID: $pid"
-    kill $pid
+    sudo kill "$pid"
 done
 
 
