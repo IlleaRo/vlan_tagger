@@ -38,7 +38,7 @@ up() {
     echo "[✓] Готово. Можно работать!"
 
 
-    echo -n "[?] Запустить Wireshark на eth0? [y/N]: "
+    echo -n "[?] Запустить Wireshark на veth0 и veth1? [y/N]: "
     # Проверяем, что истёк таймаут или введено пусто
     if ! read -r -t 5 answer || [ -z "$answer" ]; then
         echo "Нет ответа — выходим."
