@@ -9,6 +9,7 @@
 #include <linux/if_ether.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 #include <sys/resource.h>
 #include <signal.h>
 #include <sys/ioctl.h>
@@ -16,7 +17,7 @@
 
 static thread_data func_params;
 
-void logging_programm_completion(struct thread_data *params)
+void logging_program_completion(thread_data *params)
 {
     if (!params)
     {
@@ -49,7 +50,7 @@ void logging_programm_completion(struct thread_data *params)
 
 void signal_handler(int signal)
 {
-    logging_programm_completion(&func_params);
+    logging_program_completion(&func_params);
     exit(EXIT_SUCCESS);
 }
 
@@ -220,5 +221,5 @@ void pthread_init(const char *interface_name)
         printL(INFO, INITIATOR, "Thread №%d completed", j);
     }
 
-    logging_programm_completion(&func_params);
+    logging_program_completion(&func_params);
 }
