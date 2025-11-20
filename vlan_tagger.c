@@ -1,6 +1,8 @@
 #include "vlan_tagger.h"
 #include "logger/logger.h"
 
+#include <pthread.h>
+
 static unsigned char buffer[1522] = { 0 };
 static unsigned char second_buffer[1522] = { 0 };
 
