@@ -7,6 +7,6 @@
 
 void pthread_init(const char *);
 
-void logging_programm_completion(struct thread_data*);
+void logging_program_completion(thread_data*);
 
 #endif //pthread_init_h
