@@ -3,6 +3,8 @@
 #include "logger/logger.h"
 #include "errno.h"
 
+#include <pthread.h>
+
 void *packet_sniffer(void *thread_data)
 {
     if (!thread_data)

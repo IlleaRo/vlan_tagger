@@ -2,6 +2,7 @@
 #include "logger/logger.h"
 #include "errno.h"
 
+#include <pthread.h>
 #include <string.h>
 
 void* packet_sender(void *thread_data)
