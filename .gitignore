@@ -1,9 +1,23 @@
-*log
-*cmake-build-debug
-*idea
-*vlan-tagger.cfg
-*/.gitignore
-*/main.c
-*CMakeFiles
-*vscode
-*vscode-ctags
+# Build directory
+build/
+
+# Log files
+log
+*.log
+
+# IDE
+.idea/
+.vscode/
+cmake-build-debug/
+vscode-ctags/
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Config file (created at runtime)
+vlan-tagger.cfg
+
+# Compiled binaries
+vlan_tagger

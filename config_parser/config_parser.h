@@ -1,3 +1,6 @@
+#ifndef CONFIG_PARSER_H
+#define CONFIG_PARSER_H
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -18,3 +21,5 @@ int tag_rules_check_collisions(const tag_rules_t *, int);
 
 int config_file_check(void);
 int config_file_read(tag_rules_t *, int);
+
+#endif

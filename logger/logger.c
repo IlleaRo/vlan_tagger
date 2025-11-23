@@ -227,6 +227,8 @@ int printL(
         return -3;
     }
 
+    fflush(file);
+
     pthread_mutex_unlock(&mutex);
 
     returned_val++;
