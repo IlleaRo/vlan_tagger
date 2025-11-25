@@ -1,13 +1,7 @@
 #ifndef CONFIG_PARSER_H
 #define CONFIG_PARSER_H
 
-#include <arpa/inet.h>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 typedef struct tag_rules
 {
     struct in_addr ip_left;
@@ -18,6 +12,7 @@ typedef struct tag_rules
 int tag_rules_init(tag_rules_t **, int);
 int tag_rules_clear(tag_rules_t **);
 int tag_rules_check_collisions(const tag_rules_t *, int);
+void tag_rules_convert_to_host_order(tag_rules_t *, int);  // TODO: убрать костыль после рефакторинга правил
 
 int config_file_check(void);
 int config_file_read(tag_rules_t *, int);
