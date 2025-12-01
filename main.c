@@ -15,7 +15,6 @@
 #include "nodes/sniffer_node.h"
 #include "nodes/tagger_node.h"
 #include "nodes/sender_node.h"
-#include "nodes/ip_modifier_node.h"
 #include "nodes/packet_counter_node.h"
 #include "logger/logger.h"
 #include "config_parser/config_parser.h"
@@ -175,6 +174,8 @@ int main(int argc, char *argv[])
         cleanup();
         exit(EXIT_FAILURE);
     }
+
+    tag_rules_convert_to_host_order(global_tag_rules, size);
 
     global_pipeline = pipeline_create();
     if (!global_pipeline)

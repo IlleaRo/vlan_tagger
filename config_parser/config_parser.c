@@ -1,5 +1,9 @@
 #include "config_parser.h"
+
+#include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <arpa/inet.h>
 
 #define FILE_DIR "vlan-tagger.cfg"
 
@@ -427,4 +431,12 @@ char* line_editor(char *string)
     }
 
     return string;
+}
+
+
+void tag_rules_convert_to_host_order(tag_rules_t *rules, const int len) {
+    for (int i = 0; i < len; i++) {
+        rules[i].ip_left.s_addr = ntohl(rules[i].ip_left.s_addr);
+        rules[i].ip_right.s_addr = ntohl(rules[i].ip_right.s_addr);
+    }
 }
