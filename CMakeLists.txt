@@ -3,6 +3,8 @@ project(vlan_tagger C)               # Create project "vlan_tagger"
 
 set(CMAKE_C_STANDARD 17)
 
+set(DEBUG_EN ON)
+
 #static library folders
 add_subdirectory(logger)
 add_subdirectory(config_parser)
@@ -20,4 +22,8 @@ set(SOURCE_FILES
 )
 
 add_executable(vlan_tagger ${SOURCE_FILES})
+if(DEBUG_EN)
+    target_compile_definitions(vlan_tagger PUBLIC DEBUG)
+endif()
+
 target_link_libraries(vlan_tagger PRIVATE logger config_parser queue)

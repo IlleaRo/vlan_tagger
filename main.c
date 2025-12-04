@@ -1,15 +1,14 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <linux/if_packet.h>
 #include <linux/if_ether.h>
-#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <net/if.h>
+#include <sys/ioctl.h>
 #include <sys/resource.h>
-#include <errno.h>
 
 #include "pipeline/pipeline.h"
 #include "nodes/sniffer_node.h"
@@ -41,12 +40,6 @@ static void cleanup(void)
         global_pipeline = NULL;
     }
 
-    if (sock_r >= 0)
-    {
-        close(sock_r);
-        printL(INFO, INITIATOR, "Socket closed.");
-    }
-
     if (global_tag_rules)
     {
         tag_rules_clear(&global_tag_rules);
@@ -58,9 +51,17 @@ static void cleanup(void)
 
 int main(const int argc, char *argv[])
 {
-    if (argc != 2)
+    if (argc != 2)  // TODO: Add output interface
     {
-        printf("Usage: <name of the network interface>\n");
+        fprintf(stderr, "Usage: <name of the network interface>\n");
+        exit(EXIT_FAILURE);
+    }
+
+    const size_t net_dev_len = strlen(argv[1]);
+
+    if (net_dev_len < 1 || net_dev_len > IFNAMSIZ - 1) {
+        fprintf(stderr, "Invalid network interface\n");
+
         exit(EXIT_FAILURE);
     }
 
@@ -118,8 +119,8 @@ int main(const int argc, char *argv[])
     }
 
     struct ifreq ifr = {0};
-    strncpy(ifr.ifr_name, argv[1], sizeof(ifr.ifr_name));
-
+    strncpy(ifr.ifr_name, argv[1], IFNAMSIZ - 1);
+    ifr.ifr_name[IFNAMSIZ - 1] = '\0';
     if (ioctl(sock_r, SIOCGIFINDEX, &ifr) == -1)
     {
         printL(ERROR, INITIATOR, "Error with interface id");
@@ -127,22 +128,18 @@ int main(const int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_ll sa = {};
-    sa.sll_family = AF_PACKET;
-    sa.sll_protocol = htons(ETH_P_ALL);
-    sa.sll_ifindex = ifr.ifr_ifindex;
+    struct sockaddr_ll saddr = {};
+    saddr.sll_family = AF_PACKET;
+    saddr.sll_protocol = htons(ETH_P_ALL);
+    saddr.sll_ifindex = ifr.ifr_ifindex;
+    int saddr_len = sizeof(saddr);
 
-    if (bind(sock_r, (struct sockaddr *)&sa, sizeof(sa)) == -1)
+    if (bind(sock_r, (struct sockaddr *)&saddr, sizeof(saddr)) == -1)
     {
         printL(ERROR, INITIATOR, "Error setting up network interface for socket (error code: %d)!", errno);
         cleanup();
         exit(EXIT_FAILURE);
     }
-
-    struct sockaddr_ll saddr = {};
-    saddr.sll_family = AF_PACKET;
-    saddr.sll_protocol = htons(ETH_P_ALL);
-    int saddr_len = sizeof(saddr);
 
     if (config_file_check() != 0)
     {
@@ -158,7 +155,7 @@ int main(const int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    int size = config_file_read(global_tag_rules, 64);
+    const int size = config_file_read(global_tag_rules, 64);
     if (size < 0)
     {
         printL(ERROR, PARSER, "Error reading config file!");
@@ -184,7 +181,7 @@ int main(const int argc, char *argv[])
     }
 
     // Создаем узлы для сложного pipeline
-    Node* sniffer = sniffer_node_create("Sniffer", &sock_r, &saddr, &saddr_len);
+    Node* sniffer = sniffer_node_create("Sniffer", argv[1]);
     Node* tagger1 = tagger_node_create("Tagger1", global_tag_rules, size);
     Node* tagger2 = tagger_node_create("Tagger2", global_tag_rules, size);
     Node* counter = packet_counter_node_create("PacketCounter", 10);  // Логировать каждые 10 пакетов

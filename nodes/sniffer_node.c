@@ -4,83 +4,135 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
+#include <linux/if_ether.h>
+#include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <sys/socket.h>
 
-Node* sniffer_node_create(const char* name, int* socket, struct sockaddr_ll* saddr, int* saddr_len)
-{
-    if (!name || !socket || !saddr || !saddr_len)
-    {
+
+Node *sniffer_node_create(const char *name, const char *dev_name) {
+#ifdef DEBUG
+    if (!name || !dev_name) {
         return NULL;
     }
+#endif // DEBUG
 
-    SnifferContext* ctx = (SnifferContext*)calloc(1, sizeof(SnifferContext));
-    if (!ctx)
-    {
-        return NULL;
+    sniffer_context_t *ctx = calloc(1, sizeof(sniffer_context_t));
+    if (!ctx) {
+        goto __clear_and_exit;
     }
 
-    ctx->socket = socket;
-    ctx->saddr = saddr;
-    ctx->saddr_len = saddr_len;
+    ctx->socket = -1;
 
-    Node* node = node_create(name, NODE_TYPE_SNIFFER, sniffer_node_process, ctx);
-    if (!node)
-    {
-        free(ctx);
-        return NULL;
+#ifdef DEBUG
+    const size_t dev_name_len = strlen(dev_name);
+
+    if (dev_name_len >= IFNAMSIZ || dev_name_len < 1) {
+        goto __clear_and_exit;
+    }
+#endif // DEBUG
+
+    ctx->socket = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if (ctx->socket < 0) {
+        printL(ERROR, INITIATOR, "Socket opening error (error code: %d)!", errno);
+
+        goto __clear_and_exit;
+    }
+
+    struct ifreq ifr = {};
+    strncpy(ifr.ifr_name, dev_name, IFNAMSIZ - 1);
+    ifr.ifr_name[IFNAMSIZ - 1] = '\0';
+
+    if (ioctl(ctx->socket, SIOCGIFINDEX, &ifr) == -1) {
+        printL(ERROR, INITIATOR, "Error with interface id");
+
+        goto __clear_and_exit;
+    }
+
+    ctx->saddr.sll_family = AF_PACKET;
+    ctx->saddr.sll_protocol = htons(ETH_P_ALL);
+    ctx->saddr.sll_ifindex = ifr.ifr_ifindex;
+
+    if (bind(ctx->socket, (struct sockaddr *) &ctx->saddr, sizeof(ctx->saddr)) == -1) {
+        printL(ERROR, INITIATOR, "Error setting up network interface for socket (error code: %d)!", errno);
+
+        goto __clear_and_exit;
+    }
+
+    Node *node = node_create(name, NODE_TYPE_SNIFFER, sniffer_node_process, ctx);
+    if (!node) {
+        goto __clear_and_exit;
     }
 
     return node;
-}
 
-void* sniffer_node_process(void* node_ptr)
-{
-    if (!node_ptr)
-    {
-        return NULL;
+__clear_and_exit:
+    if (ctx) {
+        if (ctx->socket >= 0) {
+            close(ctx->socket);
+        }
+
+        free(ctx);
     }
 
-    Node* node = (Node*)node_ptr;
-    SnifferContext* ctx = (SnifferContext*)node->context;
+    return NULL;
+}
 
-    if (!ctx || !ctx->socket || !ctx->saddr || !ctx->saddr_len)
-    {
+void *sniffer_node_process(void *node_ptr) {
+#ifdef DEBUG
+    if (!node_ptr) {
+        return NULL;
+    }
+#endif // DEBUG
+
+    Node *node = node_ptr;
+    sniffer_context_t *ctx = node->context;
+
+#ifdef DEBUG
+    if (!ctx) {
         printL(ERROR, SNIFFER, "Invalid context in sniffer node");
         return NULL;
     }
+#endif // DEBUG
 
-    long buffer_len;
-    unsigned char buffer[ETHERNET_FRAME_LENGTH] = {0};
-    int err_counter = 0;
+    uint8_t buffer[ETHERNET_FRAME_LENGTH] = {};
+    uint8_t err_counter = 0;
 
-    printL(INFO, SNIFFER, "Sniffer node started: %s (socket fd=%d)", node->name, *ctx->socket);
+    printL(INFO, SNIFFER, "Sniffer node started: %s (socket fd=%d)", node->name, ctx->socket);
 
-    while (!node->should_exit || !*node->should_exit)
-    {
-        buffer_len = recvfrom(*ctx->socket, buffer, sizeof(buffer), 0,
-                             (struct sockaddr *)ctx->saddr,
-                             (socklen_t *)ctx->saddr_len);
+    while (!node->should_exit || !*node->should_exit) {
+        socklen_t saddr_len = sizeof(ctx->saddr); // recvfrom may change addr_len
 
-        if (buffer_len < 0)
-        {
-            if (err_counter == 3)
-            {
+        const ssize_t rcv_len = recvfrom(ctx->socket, buffer, sizeof(buffer), 0,
+                                         (struct sockaddr *) &ctx->saddr,
+                                         &saddr_len);
+
+        if (rcv_len < 0) {
+            if (err_counter >= MAX_ERR_NUM) {
                 printL(ERROR, SNIFFER, "%s: Error receiving packets (error code: %d)!", node->name, errno);
-                if (node->should_exit)
-                {
+
+                if (node->should_exit) {
                     *node->should_exit = 1;
                 }
+
+                close(ctx->socket);
+
                 return NULL;
             }
 
             err_counter++;
             printL(WARNING, SNIFFER, "%s: Error receiving packets (error code: %d)!", node->name, errno);
-        }
-        else
-        {
+        } else {
             err_counter = 0;
-            node_send_to_outputs(node, buffer, buffer_len);
+            node_send_to_outputs(node, buffer, rcv_len);
         }
     }
 
     printL(INFO, SNIFFER, "Sniffer node stopped: %s", node->name);
+
+    close(ctx->socket);
+
+    return NULL;
 }
