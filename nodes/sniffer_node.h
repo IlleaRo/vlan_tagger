@@ -2,16 +2,16 @@
 #define SNIFFER_NODE_H
 
 #include "../pipeline/node.h"
-#include <sys/socket.h>
 #include <linux/if_packet.h>
 
-typedef struct SnifferContext {
-    int* socket;
-    struct sockaddr_ll* saddr;
-    int* saddr_len;
-} SnifferContext;
+#define MAX_ERR_NUM 3
 
-Node* sniffer_node_create(const char* name, int* socket, struct sockaddr_ll* saddr, int* saddr_len);
+typedef struct sniffer_context {
+    int socket;
+    struct sockaddr_ll saddr;
+} sniffer_context_t;
+
+Node* sniffer_node_create(const char *, const char *);
 
 void* sniffer_node_process(void* node_ptr);
 
