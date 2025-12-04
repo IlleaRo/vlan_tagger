@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)  # CMake version check
 project(vlan_tagger C)               # Create project "vlan_tagger"
 
-set(CMAKE_C_STANDARD 23) # Enable c 23 standard
+set(CMAKE_C_STANDARD 17)
 
 #static library folders
 add_subdirectory(logger)

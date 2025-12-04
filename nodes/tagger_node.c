@@ -50,7 +50,7 @@ static int tagger_node_get_tag(const uint32_t addr, const tag_rules_t *tag_rules
 }
 
 static uint8_t *tagger_node_get_ip_offset(uint8_t *buffer) {
-    constexpr uint16_t offset = ETH_HLEN;
+    const uint16_t offset = ETH_HLEN;
 
     uint16_t ether_type;
     memcpy(&ether_type, buffer + 12, sizeof(ether_type));

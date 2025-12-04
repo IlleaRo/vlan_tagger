@@ -56,7 +56,7 @@ static void cleanup(void)
     stop_log();
 }
 
-int main(int argc, char *argv[])
+int main(const int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    pid_t pid = fork();
+    const pid_t pid = fork();
     if (pid < 0)
     {
         perror("FORK");
@@ -117,8 +117,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    struct ifreq ifr;
-    memset(&ifr, 0, sizeof(ifr));
+    struct ifreq ifr = {0};
     strncpy(ifr.ifr_name, argv[1], sizeof(ifr.ifr_name));
 
     if (ioctl(sock_r, SIOCGIFINDEX, &ifr) == -1)
@@ -128,8 +127,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_ll sa;
-    memset(&sa, 0, sizeof(sa));
+    struct sockaddr_ll sa = {};
     sa.sll_family = AF_PACKET;
     sa.sll_protocol = htons(ETH_P_ALL);
     sa.sll_ifindex = ifr.ifr_ifindex;
@@ -141,7 +139,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_ll saddr = {0};
+    struct sockaddr_ll saddr = {};
     saddr.sll_family = AF_PACKET;
     saddr.sll_protocol = htons(ETH_P_ALL);
     int saddr_len = sizeof(saddr);
@@ -168,7 +166,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if (tag_rules_check_collisions((const tag_rules_t *)global_tag_rules, size) != 0)
+    if (tag_rules_check_collisions(global_tag_rules, size) != 0)
     {
         printL(ERROR, PARSER, "Error checking config file for collisions!");
         cleanup();

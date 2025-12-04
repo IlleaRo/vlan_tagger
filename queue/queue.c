@@ -28,15 +28,15 @@ int init(Queue_t *q) {
     }
 #endif
 
-    if (pthread_rwlock_init(&q->rw_lock, nullptr) != 0) {
+    if (pthread_rwlock_init(&q->rw_lock, NULL) != 0) {
         return -1;
     }
 
-    if (pthread_mutex_init(&q->cond_mutex, nullptr) != 0) {
+    if (pthread_mutex_init(&q->cond_mutex, NULL) != 0) {
         return -1;
     }
 
-    if (pthread_cond_init(&q->condition, nullptr)) {
+    if (pthread_cond_init(&q->condition, NULL)) {
         return -1;
     }
 
