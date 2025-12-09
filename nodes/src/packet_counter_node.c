@@ -1,6 +1,6 @@
-#include "packet_counter_node.h"
-#include "../logger/logger.h"
-#include "../common.h"
+#include "../include/packet_counter_node.h"
+#include "../../logger/logger.h"
+#include "../../common.h"
 #include <stdlib.h>
 #include <string.h>
 

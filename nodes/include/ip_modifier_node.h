@@ -1,7 +1,7 @@
 #ifndef IP_MODIFIER_NODE_H
 #define IP_MODIFIER_NODE_H
 
-#include "../pipeline/node.h"
+#include "../../pipeline/node.h"
 #include <stdint.h>
 
 typedef struct IpModifierContext {

@@ -1,9 +1,9 @@
-#include "tagger_node.h"
+#include "../include/tagger_node.h"
 
 #include <stdio.h>
 
-#include "../logger/logger.h"
-#include "../common.h"
+#include "../../logger/logger.h"
+#include "../../common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <linux/if_ether.h>
