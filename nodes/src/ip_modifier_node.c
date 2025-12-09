@@ -1,6 +1,6 @@
-#include "ip_modifier_node.h"
-#include "../logger/logger.h"
-#include "../common.h"
+#include "../include/ip_modifier_node.h"
+#include "../../logger/logger.h"
+#include "../../common.h"
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
