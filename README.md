@@ -74,8 +74,12 @@ sudo ./netns_blackhole.sh up
 
 ```bash
 cd build
-sudo ./vlan_tagger veth0
+sudo ./vlan_tagger veth0 veth1
 ```
+
+Аргументы:
+- `veth0` (первый) - source interface для Sniffer
+- `veth1` (второй) - destination interface для Sender
 
 ## Ручное тестирование
 
