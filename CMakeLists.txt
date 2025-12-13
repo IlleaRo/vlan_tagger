@@ -14,6 +14,7 @@ set(SOURCE_FILES
         main.c
         pipeline/node.c
         pipeline/pipeline.c
+        pipeline_patterns/patterns.c
         nodes/src/sniffer_node.c
         nodes/src/tagger_node.c
         nodes/src/sender_node.c
