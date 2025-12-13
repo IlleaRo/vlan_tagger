@@ -41,7 +41,9 @@ Node *tagger_node_create(const char *name, tag_rule_t *tag_rules, const int tag_
 
 static int tagger_node_get_tag(const uint32_t addr, const tag_rule_t *tag_rules_obj, const int num_rules) {
     for (int i = 0; i < num_rules; ++i) {
-        if (tag_rules_obj[i].ip_left.s_addr <= addr && tag_rules_obj[i].ip_right.s_addr >= addr) {
+        uint32_t left = ntohl(tag_rules_obj[i].ip_left.s_addr);
+        uint32_t right = ntohl(tag_rules_obj[i].ip_right.s_addr);
+        if (left <= addr && right >= addr) {
             return tag_rules_obj[i].tag;
         }
     }

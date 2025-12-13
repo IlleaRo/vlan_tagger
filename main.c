@@ -30,44 +30,44 @@ static void cleanup(void)
 {
     pipeline_destroy(&global_pipeline);
 
-    if (global_tag_rules.rules)
-    {
-        tag_rules_clear(&global_tag_rules.rules);
-        printL(INFO, INITIATOR, "Tag rules cleared.");
-    }
+    tag_rules_destroy(&global_tag_rules);
+    printL(INFO, INITIATOR, "Tag rules destroyed.");
 
     stop_log();
 }
 
-static int fill_tag_rules(tag_rules_t *tag_rules_ptr) {
-    if (config_file_check() != 0)
+static int fill_tag_rules(tag_rules_t *tag_rules_ptr, const char *config_path) {
+    // Инициализация
+    if (tag_rules_init(tag_rules_ptr, 0) != 0)
     {
-        printL(ERROR, PARSER, "Error opening/closing config file!");
+        printL(ERROR, PARSER, "Error initializing tag rules structure!");
         return 1;
     }
 
-    if (tag_rules_init(&tag_rules_ptr->rules, 64) != 0)
+    // Загрузка
+    const int loaded_count = tag_rules_load_from_file(tag_rules_ptr, config_path);
+    if (loaded_count < 0)
     {
-        printL(ERROR, PARSER, "Error allocating memory for tag rules!");
+        printL(ERROR, PARSER, "Error loading config file (code: %d)!", loaded_count);
+        tag_rules_destroy(tag_rules_ptr);
         return 1;
     }
 
-    const int size = config_file_read(tag_rules_ptr->rules, 64);
-    if (size < 0)
+    if (loaded_count == 0)
     {
-        printL(ERROR, PARSER, "Error reading config file!");
+        printL(WARNING, PARSER, "No rules loaded from config file!");
+    }
+
+    // Валидация
+    const int validation_result = tag_rules_validate(tag_rules_ptr);
+    if (validation_result != 0)
+    {
+        printL(ERROR, PARSER, "Config validation failed (errors: %d)!", validation_result);
+        tag_rules_destroy(tag_rules_ptr);
         return 1;
     }
 
-    if (tag_rules_check_collisions(tag_rules_ptr->rules, size) != 0)
-    {
-        printL(ERROR, PARSER, "Error checking config file for collisions!");
-        return 1;
-    }
-
-    tag_rules_convert_to_host_order(tag_rules_ptr->rules, size);
-
-    tag_rules_ptr->size = size;
+    printL(INFO, PARSER, "Loaded %d tag rules from %s", loaded_count, config_path);
 
     return 0;
 }
@@ -126,7 +126,7 @@ int main(const int argc, char *argv[])
         }
     }
 
-    if (fill_tag_rules(&global_tag_rules)) {
+    if (fill_tag_rules(&global_tag_rules, "vlan-tagger.cfg")) {
         printL(ERROR, PARSER, "Error reading tag rules!");
 
         cleanup();

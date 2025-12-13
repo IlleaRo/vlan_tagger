@@ -22,10 +22,12 @@ int vlan_tagger_pattern(Pipeline *pipeline, const void *ctx) {
     Node *sender = NULL;
 
     if (!((sniffer = sniffer_node_create("Sniffer", vlan_tagger_context->src_dev_name)))
-        || !((tagger1 = tagger_node_create("Tagger1", vlan_tagger_context->tag_rules->rules,
-                                           vlan_tagger_context->tag_rules->size)))
-        || !((tagger2 = tagger_node_create("Tagger2", vlan_tagger_context->tag_rules->rules,
-                                           vlan_tagger_context->tag_rules->size)))
+        || !((tagger1 = tagger_node_create("Tagger1",
+                                           tag_rules_get_array(vlan_tagger_context->tag_rules),
+                                           tag_rules_get_size(vlan_tagger_context->tag_rules))))
+        || !((tagger2 = tagger_node_create("Tagger2",
+                                           tag_rules_get_array(vlan_tagger_context->tag_rules),
+                                           tag_rules_get_size(vlan_tagger_context->tag_rules))))
         || !((counter = packet_counter_node_create("PacketCounter", 10)))
         || !((sender = sender_node_create("Sender", vlan_tagger_context->dst_dev_name)))) {
         goto __clear_and_exit;

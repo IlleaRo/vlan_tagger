@@ -2,6 +2,7 @@
 #define CONFIG_PARSER_H
 
 #include <netinet/in.h>
+
 typedef struct tag_rules
 {
     struct in_addr ip_left;
@@ -12,14 +13,14 @@ typedef struct tag_rules
 typedef struct {
     tag_rule_t* rules;
     int size;
-} tag_rules_t; // TODO: нужно пересмотреть проект и переписать раздельное использование массива правил и размера на единую структуру
+    int capacity;
+} tag_rules_t;
 
-int tag_rules_init(tag_rule_t **, int);
-int tag_rules_clear(tag_rule_t **);
-int tag_rules_check_collisions(const tag_rule_t *, int);
-void tag_rules_convert_to_host_order(tag_rule_t *, int);  // TODO: убрать костыль после рефакторинга правил
-
-int config_file_check(void);
-int config_file_read(tag_rule_t *, int);
+int tag_rules_init(tag_rules_t *tag_rules, int initial_capacity);
+void tag_rules_destroy(tag_rules_t *tag_rules);
+int tag_rules_load_from_file(tag_rules_t *tag_rules, const char *config_path);
+int tag_rules_validate(const tag_rules_t *tag_rules);
+const tag_rule_t* tag_rules_get_array(const tag_rules_t *tag_rules);
+int tag_rules_get_size(const tag_rules_t *tag_rules);
 
 #endif
