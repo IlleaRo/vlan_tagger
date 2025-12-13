@@ -14,14 +14,14 @@ int ip_comparison(const struct in_addr, const struct in_addr);
 int ip_str_to_int(char *, int *);
 int char_count(const char *, char);
 
-int tag_rules_init(tag_rules_t **tag_rules_obj, int size)
+int tag_rules_init(tag_rule_t **tag_rules_obj, int size)
 {
     if (*tag_rules_obj != NULL || size <= 0)
     {
         return -1;
     }
 
-    *tag_rules_obj = (tag_rules_t*) calloc(size, sizeof(tag_rules_t));
+    *tag_rules_obj = (tag_rule_t*) calloc(size, sizeof(tag_rule_t));
 
     if (tag_rules_obj == NULL)
     {
@@ -31,7 +31,7 @@ int tag_rules_init(tag_rules_t **tag_rules_obj, int size)
     return 0;
 }
 
-int tag_rules_clear(tag_rules_t **tag_rules_obj)
+int tag_rules_clear(tag_rule_t **tag_rules_obj)
 {
     if (*tag_rules_obj == NULL)
     {
@@ -43,7 +43,7 @@ int tag_rules_clear(tag_rules_t **tag_rules_obj)
     return 0;
 }
 
-int tag_rules_check_collisions(const tag_rules_t *tag_rules_obj, int size)
+int tag_rules_check_collisions(const tag_rule_t *tag_rules_obj, int size)
 {
     if (tag_rules_obj == NULL || size <= 0)
     {
@@ -140,7 +140,7 @@ int config_file_check(void)
     return 0;
 }
 
-int config_file_read(tag_rules_t *tag_rules_obj, int size)
+int config_file_read(tag_rule_t *tag_rules_obj, int size)
 {
     if (tag_rules_obj == NULL)
     {
@@ -434,7 +434,7 @@ char* line_editor(char *string)
 }
 
 
-void tag_rules_convert_to_host_order(tag_rules_t *rules, const int len) {
+void tag_rules_convert_to_host_order(tag_rule_t *rules, const int len) {
     for (int i = 0; i < len; i++) {
         rules[i].ip_left.s_addr = ntohl(rules[i].ip_left.s_addr);
         rules[i].ip_right.s_addr = ntohl(rules[i].ip_right.s_addr);

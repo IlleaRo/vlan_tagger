@@ -5,11 +5,11 @@
 #include "../../config_parser/config_parser.h"
 
 typedef struct TaggerContext {
-    tag_rules_t* tag_rules;
+    tag_rule_t* tag_rules;
     int tag_rules_size;
 } TaggerContext;
 
-Node* tagger_node_create(const char* name, tag_rules_t* tag_rules, int tag_rules_size);
+Node* tagger_node_create(const char* name, tag_rule_t* tag_rules, int tag_rules_size);
 
 void* tagger_node_process(void* node_ptr);
 

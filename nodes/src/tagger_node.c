@@ -17,7 +17,7 @@
 #endif
 #define IP_HEADER_MIN_LEN 20
 
-Node *tagger_node_create(const char *name, tag_rules_t *tag_rules, const int tag_rules_size) {
+Node *tagger_node_create(const char *name, tag_rule_t *tag_rules, const int tag_rules_size) {
     if (!name || !tag_rules || tag_rules_size <= 0) {
         return NULL;
     }
@@ -39,7 +39,7 @@ Node *tagger_node_create(const char *name, tag_rules_t *tag_rules, const int tag
     return node;
 }
 
-static int tagger_node_get_tag(const uint32_t addr, const tag_rules_t *tag_rules_obj, const int num_rules) {
+static int tagger_node_get_tag(const uint32_t addr, const tag_rule_t *tag_rules_obj, const int num_rules) {
     for (int i = 0; i < num_rules; ++i) {
         if (tag_rules_obj[i].ip_left.s_addr <= addr && tag_rules_obj[i].ip_right.s_addr >= addr) {
             return tag_rules_obj[i].tag;

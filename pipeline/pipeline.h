@@ -17,7 +17,11 @@ typedef struct Pipeline {
     int should_exit;
 } Pipeline;
 
-Pipeline* pipeline_create(void);
+int pipeline_init(Pipeline *pipeline_ptr);
+
+typedef int (*pipeline_pattern_builder_cb)(Pipeline* pipeline, const void* ctx);
+
+int pipeline_build(Pipeline* pipeline, const pipeline_pattern_builder_cb cb, const void* ctx);
 
 int pipeline_add_node(Pipeline* pipeline, Node* node);
 
