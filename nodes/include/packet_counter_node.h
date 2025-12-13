@@ -1,7 +1,7 @@
 #ifndef PACKET_COUNTER_NODE_H
 #define PACKET_COUNTER_NODE_H
 
-#include "../pipeline/node.h"
+#include "../../pipeline/node.h"
 
 typedef struct PacketCounterContext {
     unsigned long total_packets;

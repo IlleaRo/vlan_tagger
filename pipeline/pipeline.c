@@ -3,31 +3,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-Pipeline* pipeline_create(void)
+int pipeline_init(Pipeline *pipeline_ptr)
 {
-    Pipeline* pipeline = (Pipeline*)malloc(sizeof(Pipeline));
-    if (!pipeline)
+    pipeline_ptr->nodes = (Node**)calloc(MAX_PIPELINE_NODES, sizeof(Node*));
+    pipeline_ptr->queues = (Queue_t**)calloc(MAX_PIPELINE_QUEUES, sizeof(Queue_t*));
+
+    if (!pipeline_ptr->nodes || !pipeline_ptr->queues)
     {
-        return NULL;
+        free(pipeline_ptr->nodes);
+        free(pipeline_ptr->queues);
+
+        return 1;
     }
 
-    pipeline->nodes = (Node**)calloc(MAX_PIPELINE_NODES, sizeof(Node*));
-    pipeline->queues = (Queue_t**)calloc(MAX_PIPELINE_QUEUES, sizeof(Queue_t*));
+    pipeline_ptr->node_count = 0;
+    pipeline_ptr->queue_count = 0;
+    pipeline_ptr->should_exit = 0;
 
-    if (!pipeline->nodes || !pipeline->queues)
-    {
-        free(pipeline->nodes);
-        free(pipeline->queues);
-        free(pipeline);
-        return NULL;
-    }
-
-    pipeline->node_count = 0;
-    pipeline->queue_count = 0;
-    pipeline->should_exit = 0;
-
-    return pipeline;
+    return 0;
 }
+
+int pipeline_build(Pipeline* pipeline, const pipeline_pattern_builder_cb cb, const void* ctx)
+{
+    if (!cb) {
+        return 1;
+    }
+
+    if (cb(pipeline, ctx)) {
+        return 1;
+    }
+
+    return 0;
+}
+
 
 int pipeline_add_node(Pipeline* pipeline, Node* node)
 {
