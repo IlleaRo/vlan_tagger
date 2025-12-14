@@ -20,6 +20,9 @@ set(SOURCE_FILES
         nodes/src/sender_node.c
         nodes/src/ip_modifier_node.c
         nodes/src/packet_counter_node.c
+        nodes/src/logger_node.c
+        nodes/src/collector_node.c
+        nodes/src/dispatcher_node.c
         nodes/src/socket_utils.c
 )
 
