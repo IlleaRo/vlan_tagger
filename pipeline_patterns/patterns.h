@@ -15,4 +15,6 @@ typedef struct {
 
 int vlan_tagger_pattern(Pipeline *pipeline, const void *ctx);
 
+int detailed_logging_pattern(Pipeline *pipeline, const void *ctx);
+
 #endif //VLAN_TAGGER_PIPELINE_PATTERNS_H
