@@ -128,16 +128,16 @@ ssize_t pop(Queue_t *q, uint8_t *buff) {
     }
 #endif
 
-    if (is_empty(q)) {
+    pthread_mutex_lock(&q->cond_mutex);
+
+    while (is_empty(q)) {
         if (pthread_cond_wait(&q->condition, &q->cond_mutex) != 0) {
             pthread_mutex_unlock(&q->cond_mutex);
-
             return -1;
         }
-
-        pthread_mutex_unlock(&q->cond_mutex);
     }
 
+    pthread_mutex_unlock(&q->cond_mutex);
     pthread_rwlock_wrlock(&q->rw_lock);
 
     memcpy(buff, q->queue[q->front], q->sizes[q->front]);
