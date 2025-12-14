@@ -7,7 +7,7 @@
 
 #define FILE_LOG_NAME "log"
 #define TIME_BUF_SIZE 80
-#define USR_MSG_SIZE 200
+#define USR_MSG_SIZE 8192
 
 
 static pthread_mutex_t mutex;
