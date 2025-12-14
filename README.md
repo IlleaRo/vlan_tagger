@@ -14,7 +14,12 @@ VLAN Tagger - это многопоточный демон на базе pipelin
 | **Tagger** | Добавляет VLAN теги (802.1Q) согласно правилам из конфига |
 | **Sender** | Отправляет обработанные пакеты обратно в сеть |
 | **PacketCounter** | Собирает статистику о пакетах (количество, размер, VLAN/non-VLAN) |
+| **Logger** | Выводит hex dump содержимого пакетов для отладки |
+| **Collector** | Объединяет данные от нескольких источников (упрощает pipeline паттерны) |
+| **Dispatcher** | Распределяет пакеты между воркерами (автоматически создается в `pipeline_connect_shared`) |
 | **IpModifier** | Модифицирует IP-адреса в пакетах с пересчётом контрольных сумм |
+
+**ВАЖНОЕ ПРАВИЛО:** Все узлы (кроме Sender) **ОБЯЗАНЫ** пробрасывать данные дальше через `node_send_to_outputs()`, даже если они выполняют только аналитику. Это гарантирует, что данные не потеряются в pipeline.
 
 ## Архитектура
 
@@ -27,6 +32,50 @@ Sniffer -> [Tagger1, Tagger2] -> PacketCounter -> Sender
 - Имеет входную очередь для приёма пакетов
 - Может отправлять пакеты в несколько выходных очередей
 - Логирует свои действия в общий файл
+
+### Режимы соединения узлов
+
+**1. Дублирование данных** (`pipeline_connect`)
+```
+     Sniffer
+        │
+    ┌───┴───┐
+  queue1  queue2    ← Две очереди
+    │       │
+ Tagger1  Tagger2   ← Оба получают копии
+```
+```c
+pipeline_connect(pipeline, sniffer, tagger1);
+pipeline_connect(pipeline, sniffer, tagger2);
+```
+
+**2. Балансировка нагрузки** (`pipeline_connect_shared`)
+```
+     Sniffer
+        │
+      queue
+        │
+    Dispatcher      ← Автоматически создается
+        │
+    ┌───┴───┐
+ queue1  queue2     ← Отдельные очереди
+    │       │
+ Tagger1  Tagger2   ← Каждый получает свою порцию (round-robin)
+```
+```c
+Node* workers[] = {tagger1, tagger2};
+pipeline_connect_shared(pipeline, sniffer, workers, 2);
+// Автоматически создаст Dispatcher_Sniffer node
+```
+
+**Архитектурный принцип:**
+- Каждая нода имеет **ровно одну** входную очередь
+- Dispatcher управляет распределением пакетов
+- Стратегии распределения: Round-Robin (по умолчанию), Random
+
+**Когда использовать:**
+- Дублирование: логирование + обработка, мониторинг
+- Балансировка: worker pool, увеличение производительности, параллельная обработка
 
 ## Быстрый старт
 
@@ -114,7 +163,7 @@ sudo tcpdump -i veth0 -e -n vlan
 
 ## Пример конфигурации pipeline
 
-В файле `main.c`:
+В файле `patterns.c`:
 
 ```c
 // Создание узлов
@@ -125,21 +174,23 @@ Node* counter = packet_counter_node_create("PacketCounter", 100);
 Node* sender = sender_node_create("Sender", &sock_r, &saddr, &saddr_len);
 
 // Добавление в pipeline
-pipeline_add_node(global_pipeline, sniffer);
-pipeline_add_node(global_pipeline, tagger1);
-pipeline_add_node(global_pipeline, tagger2);
-pipeline_add_node(global_pipeline, counter);
-pipeline_add_node(global_pipeline, sender);
+```
 
-// Соединение узлов
-pipeline_connect(global_pipeline, sniffer, tagger1);  // Sniffer -> Tagger1
-pipeline_connect(global_pipeline, sniffer, tagger2);  // Sniffer -> Tagger2
-pipeline_connect(global_pipeline, tagger1, counter);  // Tagger1 -> Counter
-pipeline_connect(global_pipeline, tagger2, counter);  // Tagger2 -> Counter
-pipeline_connect(global_pipeline, counter, sender);   // Counter -> Sender
+**Вариант 1: Дублирование (каждый tagger обрабатывает все пакеты)**
+```c
+pipeline_connect(pipeline, sniffer, tagger1);
+pipeline_connect(pipeline, sniffer, tagger2);
+pipeline_connect(pipeline, tagger1, sender);
+pipeline_connect(pipeline, tagger2, sender);
+```
 
-// Запуск pipeline
-pipeline_start(global_pipeline);
+**Вариант 2: Worker pool (пакеты распределяются между tagger'ами)**
+```c
+Node* workers[] = {tagger1, tagger2};
+pipeline_connect_shared(pipeline, sniffer, workers, 2);  // Балансировка
+pipeline_connect(pipeline, tagger1, sender);
+pipeline_connect(pipeline, tagger2, sender);
+```
 
 ## Остановка демона
 
