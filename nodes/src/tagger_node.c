@@ -1,12 +1,13 @@
 #include "../include/tagger_node.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <linux/if_ether.h>
 
 #include "../../logger/logger.h"
 #include "../../common.h"
-#include <stdlib.h>
-#include <string.h>
-#include <linux/if_ether.h>
 
 #ifndef VLAN_VID_MASK
 #define VLAN_VID_MASK 0x0fff   /* VLAN ID: 12 бит */
@@ -17,7 +18,7 @@
 #endif
 #define IP_HEADER_MIN_LEN 20
 
-Node *tagger_node_create(const char *name, tag_rule_t *tag_rules, const int tag_rules_size) {
+Node *tagger_node_create(const char *name, const tag_rule_t *tag_rules, const int tag_rules_size) {
     if (!name || !tag_rules || tag_rules_size <= 0) {
         return NULL;
     }
@@ -27,11 +28,24 @@ Node *tagger_node_create(const char *name, tag_rule_t *tag_rules, const int tag_
         return NULL;
     }
 
-    ctx->tag_rules = tag_rules;
+    // Создаём копию правил с IP в host byte order
+    ctx->tag_rules = calloc(tag_rules_size, sizeof(tagger_rule_t));
+    if (!ctx->tag_rules) {
+        free(ctx);
+        return NULL;
+    }
+
+    for (int i = 0; i < tag_rules_size; i++) {
+        ctx->tag_rules[i].ip_left = ntohl(tag_rules[i].ip_left.s_addr);
+        ctx->tag_rules[i].ip_right = ntohl(tag_rules[i].ip_right.s_addr);
+        ctx->tag_rules[i].tag = tag_rules[i].tag;
+    }
+
     ctx->tag_rules_size = tag_rules_size;
 
     Node *node = node_create(name, NODE_TYPE_TAGGER, tagger_node_process, ctx);
     if (!node) {
+        free(ctx->tag_rules);
         free(ctx);
         return NULL;
     }
@@ -39,11 +53,9 @@ Node *tagger_node_create(const char *name, tag_rule_t *tag_rules, const int tag_
     return node;
 }
 
-static int tagger_node_get_tag(const uint32_t addr, const tag_rule_t *tag_rules_obj, const int num_rules) {
+static int tagger_node_get_tag(const uint32_t addr, const tagger_rule_t *tag_rules_obj, const int num_rules) {
     for (int i = 0; i < num_rules; ++i) {
-        uint32_t left = ntohl(tag_rules_obj[i].ip_left.s_addr);
-        uint32_t right = ntohl(tag_rules_obj[i].ip_right.s_addr);
-        if (left <= addr && right >= addr) {
+        if (tag_rules_obj[i].ip_left <= addr && tag_rules_obj[i].ip_right >= addr) {
             return tag_rules_obj[i].tag;
         }
     }
