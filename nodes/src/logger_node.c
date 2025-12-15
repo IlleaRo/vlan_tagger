@@ -35,49 +35,91 @@ static void log_packet_hex(const char* node_name, unsigned char* buffer, ssize_t
 {
     char full_dump[8192];
     int total_offset = 0;
+    int n = 0;
+    int truncated = 0;
 
     // Формируем заголовок
-    total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
-                             "=== %s: Packet #%lu (%zd bytes) ===\n",
-                             node_name, pkt_num, size);
+    n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
+                 "=== %s: Packet #%lu (%zd bytes) ===\n",
+                 node_name, pkt_num, size);
+    if (n < 0 || n >= (int)(sizeof(full_dump) - total_offset)) {
+        truncated = 1;
+        goto truncated_end;
+    }
+    total_offset += n;
 
     // Формируем hex dump построчно
     for (ssize_t i = 0; i < size; i += 16)
     {
-        total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
-                                 "%04zx: ", i);
+        n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
+                     "%04zx: ", i);
+        if (n < 0 || n >= (int)(sizeof(full_dump) - total_offset)) {
+            truncated = 1;
+            goto truncated_end;
+        }
+        total_offset += n;
 
         // Hex bytes
         for (int j = 0; j < 16; j++)
         {
             if (i + j < size)
             {
-                total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
-                                         "%02x ", buffer[i + j]);
+                n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
+                             "%02x ", buffer[i + j]);
             }
             else
             {
-                total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
-                                         "   ");
+                n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
+                             "   ");
             }
+            if (n < 0 || n >= (int)(sizeof(full_dump) - total_offset)) {
+                truncated = 1;
+                goto truncated_end;
+            }
+            total_offset += n;
         }
 
         // ASCII representation
-        total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset, " |");
+        n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset, " |");
+        if (n < 0 || n >= (int)(sizeof(full_dump) - total_offset)) {
+            truncated = 1;
+            goto truncated_end;
+        }
+        total_offset += n;
         for (int j = 0; j < 16 && i + j < size; j++)
         {
             unsigned char c = buffer[i + j];
-            total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
-                                     "%c", (c >= 32 && c <= 126) ? c : '.');
+            n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset,
+                         "%c", (c >= 32 && c <= 126) ? c : '.');
+            if (n < 0 || n >= (int)(sizeof(full_dump) - total_offset)) {
+                truncated = 1;
+                goto truncated_end;
+            }
+            total_offset += n;
         }
-        total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset, "|");
+        n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset, "|");
+        if (n < 0 || n >= (int)(sizeof(full_dump) - total_offset)) {
+            truncated = 1;
+            goto truncated_end;
+        }
+        total_offset += n;
 
         if (i + 16 < size)
         {
-            total_offset += snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset, "\n");
+            n = snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset, "\n");
+            if (n < 0 || n >= (int)(sizeof(full_dump) - total_offset)) {
+                truncated = 1;
+                goto truncated_end;
+            }
+            total_offset += n;
         }
     }
 
+truncated_end:
+    if (truncated && total_offset < (int)sizeof(full_dump)) {
+        // Optionally append a truncation notice
+        snprintf(full_dump + total_offset, sizeof(full_dump) - total_offset, "\n...(truncated)...\n");
+    }
     printL(INFO, INITIATOR, "%s", full_dump);
 }
 
