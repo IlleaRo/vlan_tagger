@@ -1,7 +1,9 @@
 #include "pipeline.h"
 #include "../logger/logger.h"
+#include "../nodes/include/dispatcher_node.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 int pipeline_init(Pipeline *pipeline_ptr)
 {
@@ -35,7 +37,6 @@ int pipeline_build(Pipeline* pipeline, const pipeline_pattern_builder_cb cb, con
 
     return 0;
 }
-
 
 int pipeline_add_node(Pipeline* pipeline, Node* node)
 {
@@ -81,11 +82,29 @@ int pipeline_connect(Pipeline* pipeline, Node* from, Node* to)
         return -1;
     }
 
-    Queue_t* queue = pipeline_create_queue(pipeline);
-    if (!queue)
+    Queue_t* queue;
+
+    // Если у target ноды уже есть input_queue, переиспользуем её (чтобы не плодить новых очередей)
+    if (to->input_queue != NULL)
     {
-        printL(ERROR, INITIATOR, "Failed to create queue for connection");
-        return -1;
+        queue = to->input_queue;
+        printL(INFO, INITIATOR, "Reusing existing queue for: %s -> %s", from->name, to->name);
+    }
+    else
+    {
+        // Создаем новую очередь
+        queue = pipeline_create_queue(pipeline);
+        if (!queue)
+        {
+            printL(ERROR, INITIATOR, "Failed to create queue for connection");
+            return -1;
+        }
+
+        if (node_set_input(to, queue) != 0)
+        {
+            printL(ERROR, INITIATOR, "Failed to set input for node: %s", to->name);
+            return -1;
+        }
     }
 
     if (node_add_output(from, queue) != 0)
@@ -94,13 +113,62 @@ int pipeline_connect(Pipeline* pipeline, Node* from, Node* to)
         return -1;
     }
 
-    if (node_set_input(to, queue) != 0)
+    printL(INFO, INITIATOR, "Connected: %s -> %s", from->name, to->name);
+    return 0;
+}
+
+int pipeline_connect_shared(Pipeline* pipeline, Node* from, Node** to_nodes, int to_count)
+{
+    if (!pipeline || !from || !to_nodes || to_count <= 0)
     {
-        printL(ERROR, INITIATOR, "Failed to set input for node: %s", to->name);
         return -1;
     }
 
-    printL(INFO, INITIATOR, "Connected: %s -> %s", from->name, to->name);
+    // Создаем автоматическое имя для dispatcher'а
+    char dispatcher_name[MAX_NODE_NAME];
+    snprintf(dispatcher_name, sizeof(dispatcher_name), "Disp_%.58s", from->name);
+
+    // Создаем dispatcher node с round-robin стратегией
+    Node* dispatcher = dispatcher_node_create(dispatcher_name, DISPATCH_ROUND_ROBIN);
+    if (!dispatcher)
+    {
+        printL(ERROR, INITIATOR, "Failed to create dispatcher node");
+        return -1;
+    }
+
+    // Добавляем dispatcher в pipeline
+    if (pipeline_add_node(pipeline, dispatcher) != 0)
+    {
+        node_destroy(dispatcher);
+        printL(ERROR, INITIATOR, "Failed to add dispatcher to pipeline");
+        return -1;
+    }
+
+    // Подключаем источник к dispatcher'у
+    if (pipeline_connect(pipeline, from, dispatcher) != 0)
+    {
+        printL(ERROR, INITIATOR, "Failed to connect %s to dispatcher", from->name);
+        return -1;
+    }
+
+    // Подключаем dispatcher к каждому целевому узлу
+    for (int i = 0; i < to_count; i++)
+    {
+        if (!to_nodes[i])
+        {
+            continue;
+        }
+
+        if (pipeline_connect(pipeline, dispatcher, to_nodes[i]) != 0)
+        {
+            printL(ERROR, INITIATOR, "Failed to connect dispatcher to %s", to_nodes[i]->name);
+            return -1;
+        }
+
+        printL(INFO, INITIATOR, "Connected (shared via dispatcher): %s -> %s -> %s",
+               from->name, dispatcher_name, to_nodes[i]->name);
+    }
+
     return 0;
 }
 
