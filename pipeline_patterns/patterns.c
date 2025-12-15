@@ -21,11 +21,11 @@ int vlan_tagger_pattern(Pipeline *pipeline, const void *ctx) {
     Node *counter = NULL;
     Node *sender = NULL;
 
+    const tag_rules_t *rules = vlan_tagger_context->tag_rules;
+
     if (!((sniffer = sniffer_node_create("Sniffer", vlan_tagger_context->src_dev_name)))
-        || !((tagger1 = tagger_node_create("Tagger1", vlan_tagger_context->tag_rules->rules,
-                                           vlan_tagger_context->tag_rules->size)))
-        || !((tagger2 = tagger_node_create("Tagger2", vlan_tagger_context->tag_rules->rules,
-                                           vlan_tagger_context->tag_rules->size)))
+        || !((tagger1 = tagger_node_create("Tagger1", rules->rules, rules->size)))
+        || !((tagger2 = tagger_node_create("Tagger2", rules->rules, rules->size)))
         || !((counter = packet_counter_node_create("PacketCounter", 10)))
         || !((sender = sender_node_create("Sender", vlan_tagger_context->dst_dev_name)))) {
         goto __clear_and_exit;

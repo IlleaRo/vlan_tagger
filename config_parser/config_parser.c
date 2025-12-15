@@ -1,170 +1,186 @@
+#define _GNU_SOURCE
+
 #include "config_parser.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <limits.h>
 
-#define FILE_DIR "vlan-tagger.cfg"
+#define MAX_LINE_LENGTH 100
+#define MAX_RULE_CONTENT_LENGTH 37
+#define MIN_VLAN_ID 0
+#define MAX_VLAN_ID 4095
 
-int ip_converting(struct in_addr *, const char *);
-char* line_editor(char *);
-int tag_converting(int *, const char *);
-int ip_comparison(const struct in_addr, const struct in_addr);
-int ip_str_to_int(char *, int *);
-int char_count(const char *, char);
-
-int tag_rules_init(tag_rule_t **tag_rules_obj, int size)
+static int ip_converting(struct in_addr *in_addr_obj, const char *ip_str)
 {
-    if (*tag_rules_obj != NULL || size <= 0)
+    if (in_addr_obj == NULL || ip_str == NULL)
     {
         return -1;
     }
 
-    *tag_rules_obj = (tag_rule_t*) calloc(size, sizeof(tag_rule_t));
-
-    if (tag_rules_obj == NULL)
+    if (inet_aton(ip_str, in_addr_obj) == 0)
     {
-        return -2;
+        return -1;
     }
 
     return 0;
 }
 
-int tag_rules_clear(tag_rule_t **tag_rules_obj)
+static int tag_converting(int *tag_int, const char *tag_str)
 {
-    if (*tag_rules_obj == NULL)
+    if (tag_int == NULL || tag_str == NULL)
     {
         return -1;
     }
 
-    free(*tag_rules_obj);
+    char *endptr;
+    errno = 0;
+    long tag_long = strtol(tag_str, &endptr, 10);
+
+    if (errno == ERANGE || tag_long < INT_MIN || tag_long > INT_MAX)
+    {
+        return -1;
+    }
+
+    if (endptr == tag_str || *endptr != '\0')
+    {
+        return -1;
+    }
+
+    *tag_int = (int)tag_long;
 
     return 0;
 }
 
-int tag_rules_check_collisions(const tag_rule_t *tag_rules_obj, int size)
+static int char_count(const char *str, char symbol)
 {
-    if (tag_rules_obj == NULL || size <= 0)
+    if (str == NULL)
     {
         return -1;
     }
 
-    int err_count = 0;
-    for (int i = 0; i < size; i++)
+    int count = 0;
+    for (size_t i = 0; i < strlen(str); i++)
     {
-        int res = ip_comparison(tag_rules_obj[i].ip_left, tag_rules_obj[i].ip_right);
-        if (res < 0)
+        if (str[i] == symbol)
         {
-            return -2;
-        }
-        else if (res > 1)
-        {
-            err_count++;
+            count++;
         }
     }
 
-    if (err_count > 0)
-    {
-        return err_count;
-    }
-
-    err_count = 0;
-    for (int i = 0; i < size; i++)
-    {
-        for (int j = i + 1; j < size; j++)
-        {
-            int res_iright_jleft = ip_comparison(tag_rules_obj[i].ip_right, tag_rules_obj[j].ip_left);
-            if (res_iright_jleft < 0)
-            {
-                return -2;
-            }
-            else if (res_iright_jleft == 0)
-            {
-                continue;
-            }
-            else
-            {
-                int res_jright_ileft = ip_comparison(tag_rules_obj[j].ip_right, tag_rules_obj[i].ip_left);
-                if (res_jright_ileft < 0)
-                {
-                    return -2;
-                }
-                else if (res_jright_ileft == 0)
-                {
-                    continue;
-                }
-                else
-                {
-                    err_count++;
-                }
-            }
-        }
-    }
-
-    if (err_count > 0)
-    {
-        return err_count;
-    }
-
-    err_count = 0;
-    for (int i = 0; i < size; i++)
-    {
-        if (tag_rules_obj[i].tag < 0 || tag_rules_obj[i].tag > 4096)
-        {
-            err_count++;
-        }
-    }
-
-    if (err_count > 0)
-    {
-        return err_count;
-    }
-
-    return 0;
+    return count;
 }
 
-int config_file_check(void)
+static char* line_editor(char *string)
 {
-    FILE *pFile;
-    if ((pFile = fopen(FILE_DIR, "r")) == NULL)
+    if (!string)
     {
-        return -1;
+        return NULL;
     }
 
-    if (fclose(pFile) > 0)
+    // Поиск начала строки (пропуск пробелов и табов)
+    for (size_t i = 0; i < strlen(string); ++i)
     {
-        return -2;
-    }
-
-    return 0;
-}
-
-int config_file_read(tag_rule_t *tag_rules_obj, int size)
-{
-    if (tag_rules_obj == NULL)
-    {
-        return -1;
-    }
-
-	int i;
-    FILE* pfile;
-    if ((pfile = fopen(FILE_DIR, "r")) == NULL)
-    {
-        return -2;
-    }
-
-    for (i = 0;; i++)
-    {
-		char rule[100] = { 0 };
-        char *prule;
-        char *rule_part;
-        int full_stop_count;
-		
-        if (i == size)
+        if (string[i] != ' ' && string[i] != '\t')
         {
+            string = &string[i];
             break;
         }
+    }
+
+    // Строка-комментарий
+    if (*string == '#')
+    {
+        return string;
+    }
+
+    // Обрезаем строку на первом пробеле/табе/комментарии
+    for (int j = 0; j < MAX_RULE_CONTENT_LENGTH; j++)
+    {
+        if (string[j] == ' ' || string[j] == '\t' || string[j] == '#' || string[j] == '\n')
+        {
+            string[j] = '\0';
+            break;
+        }
+    }
+
+    return string;
+}
+
+static int validate_rules(const tag_rules_t *tag_rules)
+{
+    // Проверка 1: ip_left <= ip_right в каждом правиле
+    for (int i = 0; i < tag_rules->size; i++)
+    {
+        uint32_t left = ntohl(tag_rules->rules[i].ip_left.s_addr);
+        uint32_t right = ntohl(tag_rules->rules[i].ip_right.s_addr);
+
+        if (left > right)
+        {
+            return -11;
+        }
+    }
+
+    // Проверка 2: коллизии диапазонов
+    for (int i = 0; i < tag_rules->size; i++)
+    {
+        uint32_t i_left = ntohl(tag_rules->rules[i].ip_left.s_addr);
+        uint32_t i_right = ntohl(tag_rules->rules[i].ip_right.s_addr);
+
+        for (int j = i + 1; j < tag_rules->size; j++)
+        {
+            uint32_t j_left = ntohl(tag_rules->rules[j].ip_left.s_addr);
+            uint32_t j_right = ntohl(tag_rules->rules[j].ip_right.s_addr);
+
+            // Проверка пересечения: !(i_right < j_left || j_right < i_left)
+            if (!(i_right < j_left || j_right < i_left))
+            {
+                return -12;
+            }
+        }
+    }
+
+    // Проверка 3: валидность VLAN ID
+    for (int i = 0; i < tag_rules->size; i++)
+    {
+        if (tag_rules->rules[i].tag < MIN_VLAN_ID ||
+            tag_rules->rules[i].tag > MAX_VLAN_ID)
+        {
+            return -13;
+        }
+    }
+
+    return 0;
+}
+
+int tag_rules_load(tag_rules_t *tag_rules, const char *config_path)
+{
+    if (tag_rules == NULL || config_path == NULL)
+    {
+        return -1;
+    }
+
+    FILE *pfile = fopen(config_path, "r");
+    if (pfile == NULL)
+    {
+        return -2;
+    }
+
+    // Обнуляем структуру перед загрузкой
+    memset(tag_rules, 0, sizeof(tag_rules_t));
+
+    int loaded_count = 0;
+
+    for (;;)
+    {
+        char rule[MAX_LINE_LENGTH] = { 0 };
+        char *prule;
+        char *rule_part;
+        char *saveptr;
+        int dash_count;
 
         prule = fgets(rule, sizeof(rule), pfile);
         if (prule == NULL)
@@ -176,267 +192,100 @@ int config_file_read(tag_rule_t *tag_rules_obj, int size)
             else
             {
                 fclose(pfile);
-                return -4;
+                return -3;
             }
         }
 
-        char* real_start;
-        if ((real_start = line_editor(rule)) == NULL)
+        char* real_start = line_editor(rule);
+        if (real_start == NULL)
         {
             fclose(pfile);
-            return -10;
+            return -4;
         }
 
         if (*real_start == '\0' || *real_start == '#' || *real_start == '\n')
         {
-            --i;
             continue;
         }
 
-        full_stop_count = char_count(real_start, '-');
-        if (full_stop_count < 1 || full_stop_count > 2)
+        dash_count = char_count(real_start, '-');
+        if (dash_count < 1 || dash_count > 2)
         {
             fclose(pfile);
             return -5;
         }
 
-        rule_part = strtok(real_start, "-");
-        if (rule_part == NULL)
+        if (loaded_count >= MAX_RULES)
         {
             fclose(pfile);
             return -6;
         }
 
-        if (ip_converting(&tag_rules_obj[i].ip_left, rule_part) != 0)
+        rule_part = strtok_r(real_start, "-", &saveptr);
+        if (rule_part == NULL)
         {
             fclose(pfile);
             return -7;
         }
 
-        if (full_stop_count == 1)
-        {
-            tag_rules_obj[i].ip_right = tag_rules_obj[i].ip_left;
-        }
-        else
-        {
-            rule_part = strtok(NULL, "-");
-            if (rule_part == NULL)
-            {
-                fclose(pfile);
-                return -6;
-            }
-
-            if (ip_converting(&tag_rules_obj[i].ip_right, rule_part) != 0)
-            {
-                fclose(pfile);
-                return -7;
-            }
-        }
-
-        rule_part = strtok(NULL, "-");
-        if (rule_part == NULL)
-        {
-            fclose(pfile);
-            return -6;
-        }
-
-        if (tag_converting(&tag_rules_obj[i].tag, rule_part) != 0)
+        if (ip_converting(&tag_rules->rules[loaded_count].ip_left, rule_part) != 0)
         {
             fclose(pfile);
             return -8;
         }
+
+        if (dash_count == 1)
+        {
+            tag_rules->rules[loaded_count].ip_right = tag_rules->rules[loaded_count].ip_left;
+        }
+        else
+        {
+            rule_part = strtok_r(NULL, "-", &saveptr);
+            if (rule_part == NULL)
+            {
+                fclose(pfile);
+                return -7;
+            }
+
+            if (ip_converting(&tag_rules->rules[loaded_count].ip_right, rule_part) != 0)
+            {
+                fclose(pfile);
+                return -8;
+            }
+        }
+
+        rule_part = strtok_r(NULL, "-", &saveptr);
+        if (rule_part == NULL)
+        {
+            fclose(pfile);
+            return -7;
+        }
+
+        if (tag_converting(&tag_rules->rules[loaded_count].tag, rule_part) != 0)
+        {
+            fclose(pfile);
+            return -9;
+        }
+
+        loaded_count++;
     }
 
     if (fclose(pfile) == EOF)
     {
-        return -9;
+        return -10;
     }
 
-    return i;
-}
+    tag_rules->size = loaded_count;
 
-int ip_converting(struct in_addr *in_addr_obj, const char *ip_str)
-{
-    if (in_addr_obj == NULL || ip_str == NULL)
+    // Валидация загруженных правил
+    if (loaded_count > 0)
     {
-        return -1;
-    }
-
-    if (inet_aton(ip_str, in_addr_obj) == 0)
-    {
-        return -2;
-    }
-
-    return 0;
-}
-
-int tag_converting(int *tag_int, const char *tag_str)
-{
-    if (tag_int == NULL || tag_str == NULL)
-    {
-        return -1;
-    }
-
-	int tag_int_tmp;
-    tag_int_tmp = atoi(tag_str);
-    if (tag_int_tmp == 0 && tag_str[0] != '0')
-    {
-        return -2;
-    }
-
-    *tag_int = tag_int_tmp;
-
-    return 0;
-}
-
-int ip_comparison(const struct in_addr ip_1, const struct in_addr ip_2)
-{
-    char ip_1_str[16] = { 0 };
-    char ip_2_str[16] = { 0 };
-    char *pip_1_str = ip_1_str;
-    char *pip_2_str = ip_2_str;
-    char *ip_1_str_tmp;
-    char *ip_2_str_tmp;
-	int ip_1_int[4] = { 0 };
-    int ip_2_int[4] = { 0 };
-
-    ip_1_str_tmp = inet_ntoa(ip_1);
-    if (ip_1_str_tmp == NULL)
-    {
-        return -1;
-    }
-
-    memcpy(pip_1_str, ip_1_str_tmp, strlen(ip_1_str_tmp) + 1);
-
-    ip_2_str_tmp = inet_ntoa(ip_2);
-    if (pip_2_str == NULL)
-    {
-        return -1;
-    }
-
-    memcpy(pip_2_str, ip_2_str_tmp, strlen(ip_2_str_tmp) + 1);
-
-    if (ip_str_to_int(pip_1_str, ip_1_int) != 0)
-    {
-        return -2;
-    }
-    if (ip_str_to_int(pip_2_str, ip_2_int) != 0)
-    {
-        return -2;
-    }
-
-    for (int i = 0; i < 4; i++)
-    {
-        if (ip_1_int[i] < ip_2_int[i])
+        int validation_result = validate_rules(tag_rules);
+        if (validation_result != 0)
         {
-            return 0;
-        }
-        else if (ip_1_int[i] == ip_2_int[i])
-        {
-            if (i == 3)
-            {
-                return 1;
-            }
-            else
-            {
-                continue;
-            }
-        }
-        else if (ip_1_int[i] > ip_2_int[i])
-        {
-            return 2;
-        }
-    }
-}
-
-int ip_str_to_int(char *ip_str, int *ip_int)
-{
-    if (ip_str == NULL || ip_int == NULL)
-    {
-        return -1;
-    }
-
-    int i = 0;
-    char *ip_str_part = strtok(ip_str, ".");
-    while (ip_str_part != NULL)
-    {
-        ip_int[i] = atoi(ip_str_part);
-        if (ip_int[i] == 0 && ip_str_part[0] != '0')
-        {
-            return -2;
-        }
-
-        i++;
-        ip_str_part = strtok(NULL, ".");
-    }
-
-    return 0;
-}
-
-int char_count(const char *str, char symbol)
-{
-    if (str == NULL)
-    {
-        return -1;
-    }
-
-    int count = 0;
-    for (int i = 0; i < strlen(str); i++)
-    {
-        if (str[i] == symbol)
-        {
-            count++;
+            return validation_result;
         }
     }
 
-    return count;
-}
-
-char* line_editor(char *string)
-{
-    if (!string)
-    {
-        return NULL;
-    }
-
-    //Поиск начала строки
-    unsigned long i;
-    for (i = 0; i < strlen(string); ++i)
-    {
-        if (string[i] != ' ' && string[i] != '\t')
-        {
-            string = &string[i];
-            break;
-        }
-    }
-
-    // Ситуация, когда вся строка - комментарий
-    if (*string == '#')
-    {
-        return string;
-    }
-
-    //Поиск пробелов или табуляций до комментариев
-    for (char j = 0; j < 37; j++)
-    {
-        if (string[j] == '\n')
-        {
-            continue;
-        }
-        if (string[j] == ' ' || string[j] == '\t' || string[j] == '#')
-        {
-            string[j] = '\0';
-            break;
-        }
-    }
-
-    return string;
-}
-
-
-void tag_rules_convert_to_host_order(tag_rule_t *rules, const int len) {
-    for (int i = 0; i < len; i++) {
-        rules[i].ip_left.s_addr = ntohl(rules[i].ip_left.s_addr);
-        rules[i].ip_right.s_addr = ntohl(rules[i].ip_right.s_addr);
-    }
+    return loaded_count;
 }
