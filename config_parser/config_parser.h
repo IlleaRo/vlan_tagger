@@ -3,24 +3,41 @@
 
 #include <netinet/in.h>
 
-typedef struct tag_rules
-{
+#define MAX_RULES 128
+
+typedef struct {
     struct in_addr ip_left;
     struct in_addr ip_right;
     int tag;
 } tag_rule_t;
 
 typedef struct {
-    tag_rule_t* rules;
+    tag_rule_t rules[MAX_RULES];
     int size;
-    int capacity;
 } tag_rules_t;
 
-int tag_rules_init(tag_rules_t *tag_rules, int initial_capacity);
-void tag_rules_destroy(tag_rules_t *tag_rules);
-int tag_rules_load_from_file(tag_rules_t *tag_rules, const char *config_path);
-int tag_rules_validate(const tag_rules_t *tag_rules);
-const tag_rule_t* tag_rules_get_array(const tag_rules_t *tag_rules);
-int tag_rules_get_size(const tag_rules_t *tag_rules);
+/**
+ * Загружает и валидирует правила тегирования из файла.
+ *
+ * @param tag_rules указатель на структуру для записи правил
+ * @param config_path путь к конфигурационному файлу
+ * @return количество загруженных правил (>= 0) или код ошибки (< 0)
+ *
+ * Коды ошибок:
+ *  -1: невалидные аргументы
+ *  -2: не удалось открыть файл
+ *  -3: ошибка чтения файла
+ *  -4: ошибка парсинга строки
+ *  -5: неверный формат правила (количество дефисов)
+ *  -6: превышен лимит правил (MAX_RULES)
+ *  -7: ошибка парсинга токена
+ *  -8: невалидный IP адрес
+ *  -9: невалидный VLAN ID
+ * -10: ошибка закрытия файла
+ * -11: ip_left > ip_right в правиле
+ * -12: пересечение диапазонов IP
+ * -13: VLAN ID вне диапазона 0-4095
+ */
+int tag_rules_load(tag_rules_t *tag_rules, const char *config_path);
 
 #endif

@@ -13,6 +13,7 @@
 #include "pipeline_patterns/patterns.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
+#define DEFAULT_CONFIG_PATH "vlan-tagger.cfg"
 
 Pipeline global_pipeline = {};
 tag_rules_t global_tag_rules = {};
@@ -29,45 +30,24 @@ static void signal_handler(const int signal)
 static void cleanup(void)
 {
     pipeline_destroy(&global_pipeline);
-
-    tag_rules_destroy(&global_tag_rules);
-    printL(INFO, INITIATOR, "Tag rules destroyed.");
-
     stop_log();
 }
 
 static int fill_tag_rules(tag_rules_t *tag_rules_ptr, const char *config_path) {
-    // Инициализация
-    if (tag_rules_init(tag_rules_ptr, 0) != 0)
+    const int result = tag_rules_load(tag_rules_ptr, config_path);
+
+    if (result < 0)
     {
-        printL(ERROR, PARSER, "Error initializing tag rules structure!");
+        printL(ERROR, PARSER, "Error loading config (code: %d)!", result);
         return 1;
     }
 
-    // Загрузка
-    const int loaded_count = tag_rules_load_from_file(tag_rules_ptr, config_path);
-    if (loaded_count < 0)
-    {
-        printL(ERROR, PARSER, "Error loading config file (code: %d)!", loaded_count);
-        tag_rules_destroy(tag_rules_ptr);
-        return 1;
-    }
-
-    if (loaded_count == 0)
+    if (result == 0)
     {
         printL(WARNING, PARSER, "No rules loaded from config file!");
     }
 
-    // Валидация
-    const int validation_result = tag_rules_validate(tag_rules_ptr);
-    if (validation_result != 0)
-    {
-        printL(ERROR, PARSER, "Config validation failed (errors: %d)!", validation_result);
-        tag_rules_destroy(tag_rules_ptr);
-        return 1;
-    }
-
-    printL(INFO, PARSER, "Loaded %d tag rules from %s", loaded_count, config_path);
+    printL(INFO, PARSER, "Loaded %d tag rules from %s", result, config_path);
 
     return 0;
 }
@@ -126,7 +106,7 @@ int main(const int argc, char *argv[])
         }
     }
 
-    if (fill_tag_rules(&global_tag_rules, "vlan-tagger.cfg")) {
+    if (fill_tag_rules(&global_tag_rules, DEFAULT_CONFIG_PATH)) {
         printL(ERROR, PARSER, "Error reading tag rules!");
 
         cleanup();
