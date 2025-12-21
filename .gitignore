@@ -1,0 +1,9 @@
+*log
+*cmake-build-debug
+*idea
+*vlan-tagger.cfg
+*/.gitignore
+*/main.c
+*CMakeFiles
+*vscode
+*vscode-ctags

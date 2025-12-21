@@ -1,0 +1,1 @@
+add_library(config_parser STATIC config_parser.c config_parser.h)
