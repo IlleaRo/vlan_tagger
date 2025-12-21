@@ -4,6 +4,8 @@ project(vlan_tagger C)               # Create project "vlan_tagger"
 set(CMAKE_C_STANDARD 17)
 
 set(DEBUG_EN ON)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 #static library folders
 add_subdirectory(logger)
@@ -31,4 +33,7 @@ if(DEBUG_EN)
     target_compile_definitions(vlan_tagger PUBLIC DEBUG)
 endif()
 
-target_link_libraries(vlan_tagger PRIVATE logger config_parser queue)
+target_link_libraries(vlan_tagger PRIVATE logger config_parser queue Threads::Threads)
+
+enable_testing()
+add_subdirectory(tests)

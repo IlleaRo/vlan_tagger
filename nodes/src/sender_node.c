@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include "socket_utils.h"
-#include <linux/if_ether.h>
 
 #ifndef VLAN_ETH_FRAME_LEN
 #define VLAN_ETH_FRAME_LEN 1518
