@@ -2,7 +2,6 @@
 #include "../../logger/logger.h"
 #include "../../common.h"
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
 
 Node* logger_node_create(const char* name, int log_interval)

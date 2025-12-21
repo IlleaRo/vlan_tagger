@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include "logger.h"
 
-#define FILE_LOG_NAME "log"
+const char *FILE_LOG_NAME = "log";
 #define TIME_BUF_SIZE 80
 #define USR_MSG_SIZE 8192
 
