@@ -21,3 +21,8 @@ vlan-tagger.cfg
 
 # Compiled binaries
 vlan_tagger
+
+# Doxygen artefacts
+html
+latex
+*docs*
