@@ -15,8 +15,6 @@ static void test_init_state(void) {
     Queue_t queue = {};
 
     assert_true(init(&queue) == 0, "init should succeed");
-    assert_true(is_empty(&queue) == 1, "new queue is empty");
-    assert_true(is_full(&queue) == 0, "new queue is not full");
 
     assert_true(queue_destroy(&queue) == 0, "queue_destroy should succeed");
 }
@@ -58,8 +56,6 @@ static void test_full_queue_guard(void) {
         value = (uint8_t)i;
         assert_true(push(&queue, &value, sizeof(value)) == 1, "push fills queue");
     }
-
-    assert_true(is_full(&queue) == 1, "queue reports full after Q_SIZE pushes");
 
     value = 123;
     assert_true(push(&queue, &value, sizeof(value)) == 0, "push returns 0 when queue is full");

@@ -28,27 +28,24 @@ int init(Queue_t *q) {
     }
 #endif
 
-    if (pthread_rwlock_init(&q->rw_lock, NULL) != 0) {
-        return -1;
-    }
-
     if (pthread_mutex_init(&q->cond_mutex, NULL) != 0) {
         return -1;
     }
 
-    if (pthread_cond_init(&q->condition, NULL)) {
+    if (pthread_cond_init(&q->condition, NULL) != 0) {
+        pthread_mutex_destroy(&q->cond_mutex);
         return -1;
     }
 
     q->front = 0;
     q->rear = 0;
 
-    memset(q->sizes, 0, Q_SIZE);
+    memset(q->sizes, 0, sizeof(q->sizes));
 
     return 0;
 }
 
-int is_full(const Queue_t *q) {
+static int is_full(const Queue_t *q) {
     if (q->sizes[q->rear] == 0) {
         return 0;
     }
@@ -57,7 +54,7 @@ int is_full(const Queue_t *q) {
 }
 
 // Проверка на наличие элементов в очереди
-int is_empty(const Queue_t *q) {
+static int is_empty(const Queue_t *q) {
     if (q->sizes[q->front] == 0) {
         return 1;
     }
@@ -82,12 +79,14 @@ ssize_t push(Queue_t *q, uint8_t *buf, const uint16_t size) {
         return 0;
     }
 
+    pthread_mutex_lock(&q->cond_mutex);
+
     // Проверка на наличие свободных мест в очереди
     if (is_full(q)) {
+        pthread_mutex_unlock(&q->cond_mutex);
+
         return 0;
     }
-
-    pthread_rwlock_wrlock(&q->rw_lock);
 
     memcpy(q->queue[q->rear], buf, size);
     q->sizes[q->rear] = size;
@@ -95,7 +94,7 @@ ssize_t push(Queue_t *q, uint8_t *buf, const uint16_t size) {
 
     pthread_cond_signal(&q->condition);
 
-    pthread_rwlock_unlock(&q->rw_lock);
+    pthread_mutex_unlock(&q->cond_mutex);
 
     return size;
 }
@@ -108,16 +107,18 @@ void remove_front(Queue_t *q) {
     }
 #endif
 
+    pthread_mutex_lock(&q->cond_mutex);
+
     if (is_empty(q)) {
+        pthread_mutex_unlock(&q->cond_mutex);
+
         return;
     }
-
-    pthread_rwlock_wrlock(&q->rw_lock);
 
     q->sizes[q->front] = 0;
     next(&q->front);
 
-    pthread_rwlock_unlock(&q->rw_lock);
+    pthread_mutex_unlock(&q->cond_mutex);
 }
 
 // Получить первый элемент из очереди и удалить его
@@ -137,15 +138,12 @@ ssize_t pop(Queue_t *q, uint8_t *buff) {
         }
     }
 
-    pthread_mutex_unlock(&q->cond_mutex);
-    pthread_rwlock_wrlock(&q->rw_lock);
-
     memcpy(buff, q->queue[q->front], q->sizes[q->front]);
     const uint16_t size = q->sizes[q->front];
     q->sizes[q->front] = 0;
     next(&q->front);
 
-    pthread_rwlock_unlock(&q->rw_lock);
+    pthread_mutex_unlock(&q->cond_mutex);
 
     return size;
 }
@@ -158,17 +156,19 @@ ssize_t front(Queue_t *q, uint8_t *buff) {
         return -1;
     }
 #endif
-
+    
+    pthread_mutex_lock(&q->cond_mutex);
+    
     if (is_empty(q)) {
+        pthread_mutex_unlock(&q->cond_mutex);
+
         return -1;
     }
-
-    pthread_rwlock_rdlock(&q->rw_lock);
 
     const uint16_t size = q->sizes[q->front];
     memcpy(buff, q->queue[q->front], size);
 
-    pthread_rwlock_unlock(&q->rw_lock);
+    pthread_mutex_unlock(&q->cond_mutex);
 
     return size;
 }
@@ -181,11 +181,13 @@ ssize_t back(Queue_t *q, uint8_t *buff) {
     }
 #endif
 
+    pthread_mutex_lock(&q->cond_mutex);
+
     if (is_empty(q)) {
+        pthread_mutex_unlock(&q->cond_mutex);
+
         return -1;
     }
-
-    pthread_rwlock_rdlock(&q->rw_lock);
 
     uint16_t cursor;
     if (q->rear == 0) {
@@ -197,7 +199,7 @@ ssize_t back(Queue_t *q, uint8_t *buff) {
     const uint16_t size = q->sizes[cursor];
     memcpy(buff, q->queue[cursor], size);
 
-    pthread_rwlock_unlock(&q->rw_lock);
+    pthread_mutex_unlock(&q->cond_mutex);
 
     return size;
 }
@@ -210,10 +212,6 @@ int queue_destroy(Queue_t *q) {
 #endif
 
     int res = 0;
-
-    if (pthread_rwlock_destroy(&q->rw_lock) != 0) {
-        res = -1;
-    }
 
     if (pthread_mutex_destroy(&q->cond_mutex) != 0) {
         res = -1;

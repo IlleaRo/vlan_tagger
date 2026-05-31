@@ -23,12 +23,6 @@ typedef struct Queue {
 // Инициализация очереди
 int init(Queue_t *);
 
-// Проверка наличия свободных мест в очереди
-int is_full(const Queue_t *);
-
-// Проверка наличие элементов в очереди
-int is_empty(const Queue_t *);
-
 // Добавление элемента в очередь в конец
 ssize_t push(
     Queue_t *, // Очередь
